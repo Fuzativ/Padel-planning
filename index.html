@@ -1,0 +1,480 @@
+// Import the functions you need from the SDKs you need
+import { initializeApp } from "firebase/app";
+// TODO: Add SDKs for Firebase products that you want to use
+// https://firebase.google.com/docs/web/setup#available-libraries
+
+// Your web app's Firebase configuration
+const firebaseConfig = {
+  apiKey: "AIzaSyAIHDaJjySNkws3FcltMZ4bWNkmnm30asY",
+  authDomain: "padel-planning-a44ca.firebaseapp.com",
+  databaseURL: "https://padel-planning-a44ca-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "padel-planning-a44ca",
+  storageBucket: "padel-planning-a44ca.firebasestorage.app",
+  messagingSenderId: "995979529244",
+  appId: "1:995979529244:web:72f361ae86b076164363d9"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+
+<!doctype html>
+<html lang="da">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Padel</title>
+<style>
+  :root {
+    --bg: #F4F6F2;
+    --ink: #1D2A24;
+    --muted: #55635A;
+    --line: #B9C7BE;
+    --green: #1B7F46;
+    --green-bg: #E3F4E8;
+    --green-ink: #14633A;
+    --red: #C73E3E;
+    --yellow: #E8B100;
+    --yellow-bg: #FFF4CC;
+    --yellow-ink: #4A3D00;
+    --card: #FFFFFF;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    padding: max(20px, env(safe-area-inset-top)) 16px max(24px, env(safe-area-inset-bottom));
+  }
+  main { max-width: 480px; margin: 0 auto; display: flex; flex-direction: column; gap: 12px; }
+  h1 { margin: 0; font-size: 24px; letter-spacing: -0.02em; }
+  .sub { margin: 4px 0 0; font-size: 13px; color: var(--muted); }
+  button { font: inherit; color: inherit; }
+  :focus-visible { outline: 3px solid #2F6FEB; outline-offset: 2px; }
+
+  .banner {
+    background: var(--yellow-bg); color: var(--yellow-ink);
+    border-radius: 10px; padding: 10px 12px; font-size: 13px; line-height: 1.4;
+  }
+  .banner[hidden] { display: none; }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12px; color: #3B4A41; }
+  .legend span { display: inline-flex; align-items: center; gap: 4px; }
+
+  .pills { display: flex; gap: 8px; }
+  .pill {
+    height: 40px; padding: 0 14px; border-radius: 20px; border: 0; cursor: pointer;
+    background: #fff; box-shadow: inset 0 0 0 1.5px var(--line);
+    font-size: 13px; font-weight: 600;
+  }
+  .pill[aria-pressed="true"] { background: var(--ink); color: #fff; box-shadow: none; }
+
+  #list { display: flex; flex-direction: column; gap: 8px; }
+  .card {
+    background: var(--card); border-radius: 14px; padding: 12px;
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .card.all { background: var(--green-bg); box-shadow: inset 0 0 0 2px var(--green); }
+  .card.sub { background: #F1F8F2; box-shadow: inset 0 0 0 1.5px #7FB896; }
+  .top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .title { font-size: 15px; font-weight: 700; }
+  .badge {
+    font-size: 12px; font-weight: 600; color: #3B4A41; background: #E7EBE5;
+    border-radius: 12px; padding: 3px 10px; white-space: nowrap;
+  }
+  .card.all .badge { background: var(--green); color: #fff; }
+  .card.sub .badge { background: #2F8F5B; color: #fff; }
+
+  .grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  .cell {
+    all: unset; box-sizing: border-box; cursor: pointer;
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    padding: 4px 0; border-radius: 10px;
+    touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+    user-select: none; -webkit-user-select: none;
+  }
+  .cell:focus-visible { outline: 3px solid #2F6FEB; outline-offset: 1px; }
+  .cell[data-armed="1"] { background: rgba(29, 42, 36, 0.09); }
+  .cell svg { display: block; }
+  .cell .name {
+    font-size: 10px; color: var(--muted); font-weight: 500;
+    max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+
+  .note {
+    background: var(--yellow-bg); border-radius: 8px; padding: 6px 8px;
+    display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--yellow-ink);
+  }
+  .note label { flex: 0 0 auto; font-weight: 600; max-width: 38%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .note input {
+    flex: 1 1 auto; min-width: 0; font: inherit; font-size: 16px; /* 16px: undgår zoom på iPhone */
+    border: 0; border-radius: 6px; padding: 6px 8px; background: rgba(255,255,255,0.8); color: var(--ink);
+  }
+
+  .empty { color: var(--muted); font-size: 14px; padding: 16px 4px; }
+  .link {
+    all: unset; cursor: pointer; font-size: 13px; color: var(--muted);
+    text-decoration: underline; align-self: flex-start; padding: 8px 0;
+  }
+
+  dialog { border: 0; border-radius: 16px; padding: 18px; width: min(92vw, 380px); color: var(--ink); }
+  dialog::backdrop { background: rgba(0,0,0,0.35); }
+  dialog h2 { margin: 0 0 12px; font-size: 18px; }
+  dialog label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 10px; }
+  dialog input {
+    display: block; width: 100%; margin-top: 4px; font: inherit; font-size: 16px;
+    padding: 9px 10px; border: 1.5px solid var(--line); border-radius: 8px;
+  }
+  .dlg-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px; }
+  .btn { height: 40px; padding: 0 16px; border-radius: 10px; border: 0; font-weight: 600; cursor: pointer; background: #E7EBE5; }
+  .btn.primary { background: var(--ink); color: #fff; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Padel</h1>
+    <p class="sub">Dobbelttryk på et ketcher-ikon for at skifte: grøn, rød, gul og tilbage til blank</p>
+  </header>
+
+  <div id="banner" class="banner" hidden></div>
+
+  <div class="legend" id="legend"></div>
+
+  <div class="pills" role="group" aria-label="Filter">
+    <button type="button" class="pill" id="f-all" aria-pressed="true">Alle dage</button>
+    <button type="button" class="pill" id="f-common" aria-pressed="false">Kun mulige dage</button>
+  </div>
+
+  <div id="list" aria-live="polite"></div>
+
+  <button type="button" class="pill" id="more-days">Vis flere dage</button>
+
+  <button type="button" class="link" id="edit-names">Ret navne</button>
+</main>
+
+<dialog id="names-dialog">
+  <h2>Ret navne</h2>
+  <div id="names-fields"></div>
+  <div class="dlg-actions">
+    <button type="button" class="btn" id="names-cancel">Annullér</button>
+    <button type="button" class="btn primary" id="names-save">Gem</button>
+  </div>
+</dialog>
+
+<script type="module">
+/* ============================================================
+   1) INDSÆT DIN FIREBASE-KONFIGURATION HER (se vejledningen)
+   Lad felterne stå tomme for at prøve appen lokalt (demo-tilstand).
+   ============================================================ */
+const FIREBASE_CONFIG = {
+  apiKey: "",
+  authDomain: "",
+  databaseURL: "",
+  projectId: "",
+  appId: ""
+};
+
+/* ---------- Indstillinger ---------- */
+const DAYS_AHEAD = 28;                       // hvor mange dage der vises fra start
+const DAYS_STEP = 28;                        // hvor mange dage "Vis flere dage" tilføjer
+const DAYS_MAX = 364;                        // øvre grænse (ca. et år)
+let daysShown = DAYS_AHEAD;
+const DEFAULT_NAMES = ["Spiller 1", "Spiller 2", "Spiller 3", "Spiller 4", "Vikar"];
+const DOUBLE_TAP_MS = 400;
+
+const WEEKDAYS = ["Søndag", "Mandag", "Tirsdag", "Onsdag", "Torsdag", "Fredag", "Lørdag"];
+const MONTHS = ["jan", "feb", "mar", "apr", "maj", "jun", "jul", "aug", "sep", "okt", "nov", "dec"];
+const STATUS_WORD = { g: "kan", r: "kan ikke", y: "måske", n: "ikke svaret" };
+const NEXT_STATUS = { n: "g", g: "r", r: "y", y: "n" };
+
+/* ---------- Ikoner (statisk markup, ingen brugerdata) ---------- */
+function icon(s, size) {
+  const fill = { g: "#1B7F46", r: "#C73E3E", y: "#E8B100", n: "#D5DBD6" }[s];
+  const mark = {
+    g: '<path d="M8.8 8.6l2.4 2.4 4.2-4.6" fill="none" stroke="#fff" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/>',
+    r: '<path d="M9.2 5.8l5.6 5.6M14.8 5.8l-5.6 5.6" fill="none" stroke="#fff" stroke-width="1.9" stroke-linecap="round"/>',
+    y: '<path d="M8.6 8.6h6.8" fill="none" stroke="#1D2A24" stroke-width="1.9" stroke-linecap="round"/>',
+    n: ""
+  }[s];
+  return '<svg width="' + size + '" height="' + size + '" viewBox="0 0 24 24" aria-hidden="true">' +
+    '<rect x="4.5" y="1" width="15" height="15" rx="7.5" fill="' + fill + '"/>' +
+    '<rect x="10.4" y="15.5" width="3.2" height="7.5" rx="1.4" fill="' + fill + '"/>' + mark + '</svg>';
+}
+
+/* ---------- Lager: Firebase eller lokal demo ---------- */
+const configured = Boolean(FIREBASE_CONFIG.apiKey && FIREBASE_CONFIG.databaseURL);
+let state = { days: {}, names: {} };
+let store;
+
+async function makeFirebaseStore(onChange, onError) {
+  const base = "https://www.gstatic.com/firebasejs/10.12.2/";
+  const appMod = await import(base + "firebase-app.js");
+  const dbMod = await import(base + "firebase-database.js");
+  const app = appMod.initializeApp(FIREBASE_CONFIG);
+  const db = dbMod.getDatabase(app);
+  const { ref, onValue, set, remove } = dbMod;
+
+  onValue(ref(db, "padel"), (snap) => {
+    const v = snap.val() || {};
+    onChange({ days: v.days || {}, names: v.names || {} });
+  }, (err) => onError(err));
+
+  return {
+    setStatus: (date, i, s) => s === "n"
+      ? remove(ref(db, "padel/days/" + date + "/" + i))
+      : set(ref(db, "padel/days/" + date + "/" + i + "/s"), s),
+    setNote: (date, i, text) => text
+      ? set(ref(db, "padel/days/" + date + "/" + i + "/n"), text)
+      : remove(ref(db, "padel/days/" + date + "/" + i + "/n")),
+    setName: (i, name) => name
+      ? set(ref(db, "padel/names/" + i), name)
+      : remove(ref(db, "padel/names/" + i))
+  };
+}
+
+function makeLocalStore(onChange) {
+  const KEY = "padel-demo-v1";
+  try { state = Object.assign({ days: {}, names: {} }, JSON.parse(localStorage.getItem(KEY) || "{}")); } catch (e) {}
+  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} onChange(state); };
+  const cell = (date, i) => {
+    state.days[date] = state.days[date] || {};
+    state.days[date][i] = state.days[date][i] || {};
+    return state.days[date][i];
+  };
+  setTimeout(() => onChange(state), 0);
+  return {
+    setStatus: (date, i, s) => {
+      if (s === "n") { if (state.days[date]) delete state.days[date][i]; }
+      else cell(date, i).s = s;
+      save();
+    },
+    setNote: (date, i, text) => { const c = cell(date, i); if (text) c.n = text; else delete c.n; save(); },
+    setName: (i, name) => { if (name) state.names[i] = name; else delete state.names[i]; save(); }
+  };
+}
+
+/* ---------- Hjælpefunktioner ---------- */
+function pad2(n) { return n < 10 ? "0" + n : "" + n; }
+function dateKey(d) { return d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate()); }
+function nameOf(i) { return (state.names && state.names[i]) || DEFAULT_NAMES[i]; }
+function cellOf(date, i) { return (state.days[date] && state.days[date][i]) || {}; }
+function statusOf(date, i) { return cellOf(date, i).s || "n"; }
+
+function upcomingDays() {
+  const out = [];
+  const t = new Date();
+  for (let k = 0; k < daysShown; k++) {
+    const d = new Date(t.getFullYear(), t.getMonth(), t.getDate() + k);
+    out.push({ key: dateKey(d), title: WEEKDAYS[d.getDay()] + " " + d.getDate() + ". " + MONTHS[d.getMonth()] });
+  }
+  return out;
+}
+
+/* ---------- Visning ---------- */
+const listEl = document.getElementById("list");
+let filter = "all";
+let renderPending = false;
+
+function summarize(key) {
+  const players = [0, 1, 2, 3].filter((i) => statusOf(key, i) === "g").length;
+  const sub = statusOf(key, 4) === "g";
+  if (players === 4) return { kind: "all", badge: "Alle 4 kan" };
+  if (players === 3 && sub) return { kind: "sub", badge: "3 + vikar kan" };
+  return { kind: "", badge: players + " af 4 kan" };
+}
+
+function render() {
+  const active = document.activeElement;
+  if (active && active.classList && active.classList.contains("note-input")) { renderPending = true; return; }
+  renderPending = false;
+
+  listEl.textContent = "";
+  let shown = 0;
+
+  for (const day of upcomingDays()) {
+    const sum = summarize(day.key);
+    if (filter === "common" && !sum.kind) continue;
+    shown++;
+
+    const card = document.createElement("div");
+    card.className = "card" + (sum.kind ? " " + sum.kind : "");
+
+    const top = document.createElement("div");
+    top.className = "top";
+    const title = document.createElement("span");
+    title.className = "title";
+    title.textContent = day.title;
+    const badge = document.createElement("span");
+    badge.className = "badge";
+    badge.textContent = sum.badge;
+    top.append(title, badge);
+    card.append(top);
+
+    const grid = document.createElement("div");
+    grid.className = "grid";
+    for (let i = 0; i < 5; i++) {
+      const s = statusOf(day.key, i);
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "cell";
+      btn.dataset.date = day.key;
+      btn.dataset.player = String(i);
+      btn.setAttribute("aria-label", nameOf(i) + ": " + STATUS_WORD[s] + ", " + day.title + ". Dobbelttryk for at skifte.");
+      btn.innerHTML = icon(s, 30);
+      const nm = document.createElement("span");
+      nm.className = "name";
+      nm.textContent = nameOf(i);
+      btn.append(nm);
+      grid.append(btn);
+    }
+    card.append(grid);
+
+    for (let i = 0; i < 5; i++) {
+      if (statusOf(day.key, i) !== "y") continue;
+      const row = document.createElement("div");
+      row.className = "note";
+      const id = "note-" + day.key + "-" + i;
+      const label = document.createElement("label");
+      label.htmlFor = id;
+      label.textContent = nameOf(i) + ":";
+      const input = document.createElement("input");
+      input.type = "text";
+      input.id = id;
+      input.className = "note-input";
+      input.maxLength = 80;
+      input.placeholder = "Tilføj note (fx kan først kl. 19)";
+      input.value = cellOf(day.key, i).n || "";
+      input.dataset.date = day.key;
+      input.dataset.player = String(i);
+      row.append(label, input);
+      card.append(row);
+    }
+
+    listEl.append(card);
+  }
+
+  if (shown === 0) {
+    const p = document.createElement("p");
+    p.className = "empty";
+    p.textContent = "Ingen dage, hvor alle kan, endnu.";
+    listEl.append(p);
+  }
+}
+
+/* ---------- Interaktion ---------- */
+let lastTap = { key: "", t: 0 };
+let armTimer = null;
+
+listEl.addEventListener("click", (e) => {
+  const btn = e.target.closest(".cell");
+  if (!btn || !store) return;
+  const date = btn.dataset.date;
+  const i = Number(btn.dataset.player);
+  const key = date + "|" + i;
+  const now = Date.now();
+
+  if (lastTap.key === key && now - lastTap.t < DOUBLE_TAP_MS) {
+    lastTap = { key: "", t: 0 };
+    btn.removeAttribute("data-armed");
+    const next = NEXT_STATUS[statusOf(date, i)];
+    store.setStatus(date, i, next);
+  } else {
+    lastTap = { key, t: now };
+    btn.setAttribute("data-armed", "1");
+    clearTimeout(armTimer);
+    armTimer = setTimeout(() => btn.removeAttribute("data-armed"), DOUBLE_TAP_MS);
+  }
+});
+
+// Tastatur: Enter/mellemrum udløser click på knappen, så dobbelt-Enter virker også.
+
+const saveTimers = {};
+function queueNoteSave(input, immediate) {
+  const k = input.dataset.date + "|" + input.dataset.player;
+  clearTimeout(saveTimers[k]);
+  const run = () => store && store.setNote(input.dataset.date, Number(input.dataset.player), input.value.trim());
+  if (immediate) run(); else saveTimers[k] = setTimeout(run, 600);
+}
+listEl.addEventListener("input", (e) => { if (e.target.classList.contains("note-input")) queueNoteSave(e.target, false); });
+listEl.addEventListener("change", (e) => { if (e.target.classList.contains("note-input")) queueNoteSave(e.target, true); });
+listEl.addEventListener("focusout", (e) => {
+  if (e.target.classList.contains("note-input")) setTimeout(() => { if (renderPending) render(); }, 0);
+});
+
+function setFilter(f) {
+  filter = f;
+  document.getElementById("f-all").setAttribute("aria-pressed", String(f === "all"));
+  document.getElementById("f-common").setAttribute("aria-pressed", String(f === "common"));
+  render();
+}
+const moreBtn = document.getElementById("more-days");
+moreBtn.addEventListener("click", () => {
+  daysShown = Math.min(daysShown + DAYS_STEP, DAYS_MAX);
+  moreBtn.hidden = daysShown >= DAYS_MAX;
+  render();
+});
+document.getElementById("f-all").addEventListener("click", () => setFilter("all"));
+document.getElementById("f-common").addEventListener("click", () => setFilter("common"));
+
+/* ---------- Navne ---------- */
+const dlg = document.getElementById("names-dialog");
+const fields = document.getElementById("names-fields");
+document.getElementById("edit-names").addEventListener("click", () => {
+  fields.textContent = "";
+  for (let i = 0; i < 5; i++) {
+    const lab = document.createElement("label");
+    lab.textContent = i < 4 ? "Spiller " + (i + 1) : "Vikar";
+    const inp = document.createElement("input");
+    inp.type = "text";
+    inp.maxLength = 20;
+    inp.value = nameOf(i);
+    inp.dataset.player = String(i);
+    lab.append(inp);
+    fields.append(lab);
+  }
+  dlg.showModal();
+});
+document.getElementById("names-cancel").addEventListener("click", () => dlg.close());
+document.getElementById("names-save").addEventListener("click", () => {
+  fields.querySelectorAll("input").forEach((inp) => {
+    const i = Number(inp.dataset.player);
+    const v = inp.value.trim();
+    store.setName(i, v === DEFAULT_NAMES[i] ? "" : v);
+  });
+  dlg.close();
+});
+
+/* ---------- Forklaring + start ---------- */
+const legend = document.getElementById("legend");
+[["g", "Kan"], ["r", "Kan ikke"], ["y", "Måske"], ["n", "Ikke svaret"]].forEach(([s, t]) => {
+  const span = document.createElement("span");
+  span.innerHTML = icon(s, 18);
+  span.append(document.createTextNode(t));
+  legend.append(span);
+});
+
+const banner = document.getElementById("banner");
+function showBanner(text) { banner.textContent = text; banner.hidden = false; }
+
+function onChange(next) { state = next; render(); }
+
+(async function start() {
+  render();
+  try {
+    if (configured) {
+      store = await makeFirebaseStore(onChange, (err) =>
+        showBanner("Kunne ikke hente data fra Firebase (" + (err && err.code ? err.code : "ukendt fejl") + "). Tjek regler og konfiguration."));
+    } else {
+      showBanner("Demo-tilstand: Firebase er ikke sat op endnu, så dine valg gemmes kun på denne telefon.");
+      store = makeLocalStore(onChange);
+    }
+  } catch (err) {
+    showBanner("Kunne ikke starte forbindelsen til Firebase. Tjek konfigurationen og din internetforbindelse.");
+    store = makeLocalStore(onChange);
+  }
+})();
+</script>
+</body>
+</html>
