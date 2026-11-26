@@ -43,7 +43,7 @@
   .legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12px; color: #3B4A41; }
   .legend span { display: inline-flex; align-items: center; gap: 4px; }
 
-  .pills { display: flex; gap: 8px; }
+  .pills { display: flex; flex-wrap: wrap; gap: 8px; }
   .pill {
     height: 40px; padding: 0 14px; border-radius: 20px; border: 0; cursor: pointer;
     background: #fff; box-shadow: inset 0 0 0 1.5px var(--line);
@@ -93,6 +93,51 @@
     border: 0; border-radius: 6px; padding: 6px 8px; background: rgba(255,255,255,0.8); color: var(--ink);
   }
 
+  .week {
+    font-size: 12px; font-weight: 700; color: var(--muted);
+    text-transform: uppercase; letter-spacing: 0.06em; padding: 10px 4px 0;
+  }
+  .week:first-child { padding-top: 0; }
+
+  .card.booked { box-shadow: inset 0 0 0 2px var(--ink); }
+  .card.booked .badge { background: var(--ink); color: #fff; }
+
+  .booking { border-top: 1px solid rgba(29, 42, 36, 0.15); padding-top: 8px; display: flex; flex-direction: column; gap: 8px; }
+  .check { display: flex; align-items: center; gap: 10px; font-size: 14px; font-weight: 600; min-height: 44px; cursor: pointer; }
+  .check input { width: 24px; height: 24px; margin: 0; accent-color: var(--ink); flex: 0 0 auto; }
+  .bk-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .bk-grid label { display: flex; flex-direction: column; gap: 3px; font-size: 11px; font-weight: 600; color: var(--muted); min-width: 0; }
+  .bk-grid input, .bk-grid select {
+    -webkit-appearance: none; appearance: none;
+    display: block; box-sizing: border-box;
+    font: inherit; font-size: 16px; color: var(--ink);
+    min-width: 0; width: 100%; max-width: 100%; height: 44px;
+    padding: 0 10px; border: 1.5px solid var(--line); border-radius: 8px; background: #fff;
+    text-align: left; margin: 0;
+  }
+  .bk-grid select {
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'><path d='M1 1.5l5 5 5-5' fill='none' stroke='%2355635A' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+    background-repeat: no-repeat; background-position: right 10px center; padding-right: 30px;
+  }
+
+  .rm-btn {
+    height: 44px; border-radius: 10px; background: transparent; cursor: pointer;
+    border: 1.5px solid #C73E3E; color: #B03030; font-weight: 600; font-size: 14px;
+  }
+  .bk-confirm {
+    background: #FDECEC; border-radius: 10px; padding: 10px;
+    display: flex; flex-direction: column; gap: 8px; font-size: 13px; color: #6B1F1F;
+  }
+  .bk-confirm .row { display: flex; gap: 8px; }
+  .bk-confirm button { flex: 1 1 0; height: 44px; border: 0; border-radius: 10px; font-weight: 600; font-size: 14px; cursor: pointer; }
+  .rm-yes { background: #C73E3E; color: #fff; }
+  .rm-no { background: #E7EBE5; color: var(--ink); }
+  .bk-warn { font-size: 12px; color: #8A4B00; background: var(--yellow-bg); border-radius: 8px; padding: 6px 10px; }
+  .cal-btn {
+    height: 44px; border: 0; border-radius: 10px; background: var(--ink); color: #fff;
+    font-weight: 600; font-size: 14px; cursor: pointer;
+  }
+
   .empty { color: var(--muted); font-size: 14px; padding: 16px 4px; }
   .link {
     all: unset; cursor: pointer; font-size: 13px; color: var(--muted);
@@ -126,6 +171,7 @@
   <div class="pills" role="group" aria-label="Filter">
     <button type="button" class="pill" id="f-all" aria-pressed="true">Alle dage</button>
     <button type="button" class="pill" id="f-common" aria-pressed="false">Kun mulige dage</button>
+    <button type="button" class="pill" id="f-booked" aria-pressed="false">Booket</button>
   </div>
 
   <div id="list" aria-live="polite"></div>
@@ -162,8 +208,15 @@ const DAYS_AHEAD = 28;                       // hvor mange dage der vises fra st
 const DAYS_STEP = 28;                        // hvor mange dage "Vis flere dage" tilføjer
 const DAYS_MAX = 364;                        // øvre grænse (ca. et år)
 let daysShown = DAYS_AHEAD;
-const DEFAULT_NAMES = ["Spiller 1", "Spiller 2", "Spiller 3", "Spiller 4", "Vikar"];
+const PLAYER_COUNT = 4;                      // antal faste spillere (fx 2 for to personer)
+const USE_SUBSTITUTE = true;                 // true = vis en vikar-kolonne yderst til højre
+const SLOT_COUNT = PLAYER_COUNT + (USE_SUBSTITUTE ? 1 : 0);
+const DEFAULT_NAMES = Array.from({ length: SLOT_COUNT }, (_, i) => i < PLAYER_COUNT ? "Spiller " + (i + 1) : "Vikar");
 const DOUBLE_TAP_MS = 400;
+const DURATIONS = [60, 90, 120, 150, 180];   // varighed i minutter (30 min. trin)
+const DEFAULT_DURATION = 90;
+const START_HOUR = 6;                        // første tidspunkt på listen (kl. 06.00)
+const TIME_STEP = 30;                        // trin i minutter på tidspunktslisten
 
 const WEEKDAYS = ["Søndag", "Mandag", "Tirsdag", "Onsdag", "Torsdag", "Fredag", "Lørdag"];
 const MONTHS = ["jan", "feb", "mar", "apr", "maj", "jun", "jul", "aug", "sep", "okt", "nov", "dec"];
@@ -186,7 +239,7 @@ function icon(s, size) {
 
 /* ---------- Lager: Firebase eller lokal demo ---------- */
 const configured = Boolean(FIREBASE_CONFIG.apiKey && FIREBASE_CONFIG.databaseURL);
-let state = { days: {}, names: {} };
+let state = { days: {}, names: {}, bookings: {} };
 let store;
 
 async function makeFirebaseStore(onChange, onError) {
@@ -195,11 +248,11 @@ async function makeFirebaseStore(onChange, onError) {
   const dbMod = await import(base + "firebase-database.js");
   const app = appMod.initializeApp(FIREBASE_CONFIG);
   const db = dbMod.getDatabase(app);
-  const { ref, onValue, set, remove } = dbMod;
+  const { ref, onValue, set, remove, update } = dbMod;
 
   onValue(ref(db, "padel"), (snap) => {
     const v = snap.val() || {};
-    onChange({ days: v.days || {}, names: v.names || {} });
+    onChange({ days: v.days || {}, names: v.names || {}, bookings: v.bookings || {} });
   }, (err) => onError(err));
 
   return {
@@ -211,13 +264,19 @@ async function makeFirebaseStore(onChange, onError) {
       : remove(ref(db, "padel/days/" + date + "/" + i + "/n")),
     setName: (i, name) => name
       ? set(ref(db, "padel/names/" + i), name)
-      : remove(ref(db, "padel/names/" + i))
+      : remove(ref(db, "padel/names/" + i)),
+    setBooking: (date, patch) => {
+      const clean = {};
+      for (const k in patch) clean[k] = (patch[k] === "" || patch[k] === undefined) ? null : patch[k];
+      return update(ref(db, "padel/bookings/" + date), clean);
+    },
+    clearBooking: (date) => remove(ref(db, "padel/bookings/" + date))
   };
 }
 
 function makeLocalStore(onChange) {
   const KEY = "padel-demo-v1";
-  try { state = Object.assign({ days: {}, names: {} }, JSON.parse(localStorage.getItem(KEY) || "{}")); } catch (e) {}
+  try { state = Object.assign({ days: {}, names: {}, bookings: {} }, JSON.parse(localStorage.getItem(KEY) || "{}")); } catch (e) {}
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} onChange(state); };
   const cell = (date, i) => {
     state.days[date] = state.days[date] || {};
@@ -232,7 +291,16 @@ function makeLocalStore(onChange) {
       save();
     },
     setNote: (date, i, text) => { const c = cell(date, i); if (text) c.n = text; else delete c.n; save(); },
-    setName: (i, name) => { if (name) state.names[i] = name; else delete state.names[i]; save(); }
+    setName: (i, name) => { if (name) state.names[i] = name; else delete state.names[i]; save(); },
+    setBooking: (date, patch) => {
+      state.bookings = state.bookings || {};
+      const b = state.bookings[date] = state.bookings[date] || {};
+      for (const k in patch) {
+        if (patch[k] === "" || patch[k] === undefined) delete b[k]; else b[k] = patch[k];
+      }
+      save();
+    },
+    clearBooking: (date) => { if (state.bookings) delete state.bookings[date]; save(); }
   };
 }
 
@@ -243,59 +311,147 @@ function nameOf(i) { return (state.names && state.names[i]) || DEFAULT_NAMES[i];
 function cellOf(date, i) { return (state.days[date] && state.days[date][i]) || {}; }
 function statusOf(date, i) { return cellOf(date, i).s || "n"; }
 
+function bookingOf(date) { return (state.bookings && state.bookings[date]) || {}; }
+
+// ISO 8601-ugenummer (uge 1 er ugen med årets første torsdag, ugen starter mandag)
+function isoWeek(d) {
+  const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  const day = t.getUTCDay() || 7;
+  t.setUTCDate(t.getUTCDate() + 4 - day);
+  const yearStart = new Date(Date.UTC(t.getUTCFullYear(), 0, 1));
+  return Math.ceil(((t - yearStart) / 86400000 + 1) / 7);
+}
+
 function upcomingDays() {
   const out = [];
   const t = new Date();
   for (let k = 0; k < daysShown; k++) {
     const d = new Date(t.getFullYear(), t.getMonth(), t.getDate() + k);
-    out.push({ key: dateKey(d), title: WEEKDAYS[d.getDay()] + " " + d.getDate() + ". " + MONTHS[d.getMonth()] });
+    out.push({
+      key: dateKey(d),
+      date: d,
+      week: isoWeek(d),
+      title: WEEKDAYS[d.getDay()] + " " + d.getDate() + ". " + MONTHS[d.getMonth()]
+    });
   }
   return out;
+}
+
+/* ---------- Kalenderfil (.ics) ---------- */
+function icsEscape(s) {
+  return String(s).replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\r?\n/g, "\\n");
+}
+function icsLocal(d) {
+  return d.getFullYear() + pad2(d.getMonth() + 1) + pad2(d.getDate()) + "T" + pad2(d.getHours()) + pad2(d.getMinutes()) + "00";
+}
+function downloadIcs(day) {
+  const b = bookingOf(day.key);
+  if (!b.t) return;
+  const [hh, mm] = b.t.split(":").map(Number);
+  const start = new Date(day.date.getFullYear(), day.date.getMonth(), day.date.getDate(), hh, mm);
+  const end = new Date(start.getTime() + (Number(b.d) || DEFAULT_DURATION) * 60000);
+  const now = new Date();
+  const stamp = now.getUTCFullYear() + pad2(now.getUTCMonth() + 1) + pad2(now.getUTCDate()) + "T" +
+    pad2(now.getUTCHours()) + pad2(now.getUTCMinutes()) + pad2(now.getUTCSeconds()) + "Z";
+  const place = [b.h, b.c].filter(Boolean).join(", ");
+  const players = [];
+  for (let i = 0; i < SLOT_COUNT; i++) if (statusOf(day.key, i) === "g") players.push(nameOf(i));
+  const desc = [];
+  if (players.length) desc.push("Spillere: " + players.join(", "));
+  if (b.by !== undefined && b.by !== null) desc.push("Booket af: " + nameOf(Number(b.by)));
+  const lines = [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//Padel//DA",
+    "CALSCALE:GREGORIAN",
+    "METHOD:PUBLISH",
+    "BEGIN:VEVENT",
+    "UID:padel-" + day.key + "-" + b.t.replace(":", "") + "@padel-app",
+    "DTSTAMP:" + stamp,
+    "DTSTART:" + icsLocal(start),
+    "DTEND:" + icsLocal(end),
+    "SUMMARY:Padel"
+  ];
+  if (place) lines.push("LOCATION:" + icsEscape(place));
+  if (desc.length) lines.push("DESCRIPTION:" + icsEscape(desc.join("\n")));
+  lines.push("END:VEVENT", "END:VCALENDAR");
+
+  const blob = new Blob([lines.join("\r\n") + "\r\n"], { type: "text/calendar;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "padel-" + day.key + ".ics";
+  document.body.append(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
 }
 
 /* ---------- Visning ---------- */
 const listEl = document.getElementById("list");
 let filter = "all";
 let renderPending = false;
+let confirmRemove = null;   // dato for den booking, der er ved at blive fjernet
 
 function summarize(key) {
-  const players = [0, 1, 2, 3].filter((i) => statusOf(key, i) === "g").length;
-  const sub = statusOf(key, 4) === "g";
-  if (players === 4) return { kind: "all", badge: "Alle 4 kan" };
-  if (players === 3 && sub) return { kind: "sub", badge: "3 + vikar kan" };
-  return { kind: "", badge: players + " af 4 kan" };
+  let players = 0;
+  for (let i = 0; i < PLAYER_COUNT; i++) if (statusOf(key, i) === "g") players++;
+  const sub = USE_SUBSTITUTE && statusOf(key, PLAYER_COUNT) === "g";
+  if (players === PLAYER_COUNT) {
+    return { kind: "all", badge: PLAYER_COUNT === 2 ? "Begge kan" : "Alle " + PLAYER_COUNT + " kan" };
+  }
+  if (sub && PLAYER_COUNT >= 3 && players === PLAYER_COUNT - 1) {
+    return { kind: "sub", badge: players + " + vikar kan" };
+  }
+  return { kind: "", badge: players + " af " + PLAYER_COUNT + " kan" };
 }
 
 function render() {
   const active = document.activeElement;
-  if (active && active.classList && active.classList.contains("note-input")) { renderPending = true; return; }
+  if (active && active.classList && (active.classList.contains("note-input") || active.classList.contains("bk-field"))) {
+    renderPending = true;
+    return;
+  }
   renderPending = false;
 
   listEl.textContent = "";
   let shown = 0;
+  let lastWeek = null;
 
   for (const day of upcomingDays()) {
     const sum = summarize(day.key);
-    if (filter === "common" && !sum.kind) continue;
+    const bk = bookingOf(day.key);
+    const booked = bk.b === true;
+    if (filter === "common" && !sum.kind && !booked) continue;
+    if (filter === "booked" && !booked) continue;
     shown++;
 
+    if (day.week !== lastWeek) {
+      const wk = document.createElement("div");
+      wk.className = "week";
+      wk.textContent = "Uge " + day.week;
+      listEl.append(wk);
+      lastWeek = day.week;
+    }
+
     const card = document.createElement("div");
-    card.className = "card" + (sum.kind ? " " + sum.kind : "");
+    card.className = "card" + (sum.kind ? " " + sum.kind : "") + (booked ? " booked" : "");
 
     const top = document.createElement("div");
     top.className = "top";
     const title = document.createElement("span");
     title.className = "title";
-    title.textContent = day.title;
+    title.textContent = day.title + (booked && bk.t ? " · kl. " + bk.t.replace(":", ".") : "");
     const badge = document.createElement("span");
     badge.className = "badge";
-    badge.textContent = sum.badge;
+    badge.textContent = booked ? "Booket" : sum.badge;
     top.append(title, badge);
     card.append(top);
 
     const grid = document.createElement("div");
     grid.className = "grid";
-    for (let i = 0; i < 5; i++) {
+    grid.style.gridTemplateColumns = "repeat(" + SLOT_COUNT + ", minmax(0, 1fr))";
+    for (let i = 0; i < SLOT_COUNT; i++) {
       const s = statusOf(day.key, i);
       const btn = document.createElement("button");
       btn.type = "button";
@@ -312,7 +468,7 @@ function render() {
     }
     card.append(grid);
 
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < SLOT_COUNT; i++) {
       if (statusOf(day.key, i) !== "y") continue;
       const row = document.createElement("div");
       row.className = "note";
@@ -333,13 +489,151 @@ function render() {
       card.append(row);
     }
 
+    if (sum.kind || booked) {
+      const sec = document.createElement("div");
+      sec.className = "booking";
+
+      const chk = document.createElement("label");
+      chk.className = "check";
+      const cb = document.createElement("input");
+      cb.type = "checkbox";
+      cb.className = "bk-check";
+      cb.checked = booked;
+      cb.dataset.date = day.key;
+      chk.append(cb, document.createTextNode("Bane booket"));
+      sec.append(chk);
+
+      if (booked) {
+        if (!sum.kind) {
+          const warn = document.createElement("div");
+          warn.className = "bk-warn";
+          warn.textContent = "Obs: Ikke alle kan længere på denne dag, men banen er stadig booket.";
+          sec.append(warn);
+        }
+
+        const g = document.createElement("div");
+        g.className = "bk-grid";
+        const mk = (labelText, field) => {
+          const l = document.createElement("label");
+          l.append(document.createTextNode(labelText));
+          field.classList.add("bk-field");
+          field.dataset.date = day.key;
+          l.append(field);
+          g.append(l);
+          return field;
+        };
+
+        const t = document.createElement("select");
+        const tNone = document.createElement("option");
+        tNone.value = "";
+        tNone.textContent = "Vælg";
+        t.append(tNone);
+        const times = [];
+        for (let m = START_HOUR * 60; m < 24 * 60; m += TIME_STEP) times.push(pad2(Math.floor(m / 60)) + ":" + pad2(m % 60));
+        if (bk.t && times.indexOf(bk.t) === -1) { times.push(bk.t); times.sort(); }   // bevar et tidspunkt uden for listen
+        times.forEach((tm) => {
+          const o = document.createElement("option");
+          o.value = tm;
+          o.textContent = tm.replace(":", ".");
+          t.append(o);
+        });
+        t.value = bk.t || "";
+        t.dataset.key = "t";
+        mk("Tidspunkt", t);
+
+        const d = document.createElement("select");
+        DURATIONS.forEach((m) => {
+          const o = document.createElement("option");
+          o.value = String(m);
+          o.textContent = m + " min";
+          d.append(o);
+        });
+        d.value = String(bk.d || DEFAULT_DURATION);
+        d.dataset.key = "d";
+        mk("Varighed", d);
+
+        const c = document.createElement("input");
+        c.type = "text";
+        c.maxLength = 30;
+        c.placeholder = "fx Bane 3";
+        c.value = bk.c || "";
+        c.dataset.key = "c";
+        mk("Bane", c);
+
+        const h = document.createElement("input");
+        h.type = "text";
+        h.maxLength = 40;
+        h.placeholder = "fx Hallen";
+        h.value = bk.h || "";
+        h.dataset.key = "h";
+        mk("Hal", h);
+
+        const by = document.createElement("select");
+        const none = document.createElement("option");
+        none.value = "";
+        none.textContent = "Vælg";
+        by.append(none);
+        for (let i = 0; i < SLOT_COUNT; i++) {
+          const o = document.createElement("option");
+          o.value = String(i);
+          o.textContent = nameOf(i);
+          by.append(o);
+        }
+        by.value = (bk.by === undefined || bk.by === null) ? "" : String(bk.by);
+        by.dataset.key = "by";
+        mk("Booket af", by);
+
+        sec.append(g);
+
+        if (bk.t) {
+          const cal = document.createElement("button");
+          cal.type = "button";
+          cal.className = "cal-btn";
+          cal.dataset.date = day.key;
+          cal.textContent = "Tilføj til kalender";
+          sec.append(cal);
+        }
+
+        if (confirmRemove === day.key) {
+          const bar = document.createElement("div");
+          bar.className = "bk-confirm";
+          const msg = document.createElement("span");
+          msg.textContent = "Fjern booking? Tidspunkt, bane og hal bliver slettet.";
+          const row = document.createElement("div");
+          row.className = "row";
+          const no = document.createElement("button");
+          no.type = "button";
+          no.className = "rm-no";
+          no.dataset.date = day.key;
+          no.textContent = "Behold";
+          const yes = document.createElement("button");
+          yes.type = "button";
+          yes.className = "rm-yes";
+          yes.dataset.date = day.key;
+          yes.textContent = "Fjern";
+          row.append(no, yes);
+          bar.append(msg, row);
+          sec.append(bar);
+        } else {
+          const rm = document.createElement("button");
+          rm.type = "button";
+          rm.className = "rm-btn";
+          rm.dataset.date = day.key;
+          rm.textContent = "Fjern booking";
+          sec.append(rm);
+        }
+      }
+
+      card.append(sec);
+    }
+
     listEl.append(card);
   }
 
   if (shown === 0) {
     const p = document.createElement("p");
     p.className = "empty";
-    p.textContent = "Ingen dage, hvor alle kan, endnu.";
+    p.textContent = filter === "booked" ? "Ingen bookede dage endnu." : "Ingen dage, hvor alle kan, endnu.";
     listEl.append(p);
   }
 }
@@ -378,16 +672,90 @@ function queueNoteSave(input, immediate) {
   const run = () => store && store.setNote(input.dataset.date, Number(input.dataset.player), input.value.trim());
   if (immediate) run(); else saveTimers[k] = setTimeout(run, 600);
 }
-listEl.addEventListener("input", (e) => { if (e.target.classList.contains("note-input")) queueNoteSave(e.target, false); });
-listEl.addEventListener("change", (e) => { if (e.target.classList.contains("note-input")) queueNoteSave(e.target, true); });
+function blurActive() {
+  const a = document.activeElement;
+  if (a && a !== document.body && typeof a.blur === "function") a.blur();
+}
+function cancelBookingTimers(date) {
+  for (const k in saveTimers) if (k.startsWith("bk|" + date + "|")) clearTimeout(saveTimers[k]);
+}
+// På iPhone mister et tekstfelt ikke altid fokus, når man trykker på en knap. Uden dette
+// kunne visningen blive "hængende" (opdateringer udskydes, mens et felt har fokus).
+document.addEventListener("pointerdown", (e) => {
+  if (!e.target.closest("input, select, textarea, label, dialog")) blurActive();
+});
+
+function saveBookingField(el, immediate) {
+  const date = el.dataset.date;
+  const key = el.dataset.key;
+  let val = el.value.trim();
+  if (key === "d") val = Number(val);
+  else if (key === "by") val = val === "" ? "" : Number(val);
+  const k = "bk|" + date + "|" + key;
+  clearTimeout(saveTimers[k]);
+  const run = () => store && store.setBooking(date, { [key]: val });
+  if (immediate) run(); else saveTimers[k] = setTimeout(run, 600);
+}
+
+listEl.addEventListener("input", (e) => {
+  const el = e.target;
+  if (el.classList.contains("note-input")) queueNoteSave(el, false);
+  else if (el.classList.contains("bk-field") && el.type === "text") saveBookingField(el, false);
+});
+listEl.addEventListener("change", (e) => {
+  const el = e.target;
+  if (el.classList.contains("note-input")) { queueNoteSave(el, true); return; }
+  if (el.classList.contains("bk-field")) { saveBookingField(el, true); return; }
+  if (el.classList.contains("bk-check") && store) {
+    const date = el.dataset.date;
+    blurActive();
+    if (el.checked) {
+      store.setBooking(date, { b: true, d: DEFAULT_DURATION });
+    } else {
+      const b = bookingOf(date);
+      const hasData = b.t || b.c || b.h || (b.by !== undefined && b.by !== null);
+      if (!hasData) {
+        cancelBookingTimers(date);
+        store.clearBooking(date);
+      } else {
+        el.checked = true;
+        confirmRemove = date;
+        render();
+      }
+    }
+  }
+});
 listEl.addEventListener("focusout", (e) => {
-  if (e.target.classList.contains("note-input")) setTimeout(() => { if (renderPending) render(); }, 0);
+  const c = e.target.classList;
+  if (c.contains("note-input") || c.contains("bk-field")) setTimeout(() => { if (renderPending) render(); }, 0);
+});
+listEl.addEventListener("click", (e) => {
+  const rm = e.target.closest(".rm-btn");
+  if (rm) { confirmRemove = rm.dataset.date; render(); return; }
+
+  const no = e.target.closest(".rm-no");
+  if (no) { confirmRemove = null; render(); return; }
+
+  const yes = e.target.closest(".rm-yes");
+  if (yes) {
+    confirmRemove = null;
+    cancelBookingTimers(yes.dataset.date);
+    if (store) store.clearBooking(yes.dataset.date);
+    render();
+    return;
+  }
+
+  const btn = e.target.closest(".cal-btn");
+  if (!btn) return;
+  const day = upcomingDays().find((d) => d.key === btn.dataset.date);
+  if (day) downloadIcs(day);
 });
 
 function setFilter(f) {
   filter = f;
   document.getElementById("f-all").setAttribute("aria-pressed", String(f === "all"));
   document.getElementById("f-common").setAttribute("aria-pressed", String(f === "common"));
+  document.getElementById("f-booked").setAttribute("aria-pressed", String(f === "booked"));
   render();
 }
 const moreBtn = document.getElementById("more-days");
@@ -398,15 +766,16 @@ moreBtn.addEventListener("click", () => {
 });
 document.getElementById("f-all").addEventListener("click", () => setFilter("all"));
 document.getElementById("f-common").addEventListener("click", () => setFilter("common"));
+document.getElementById("f-booked").addEventListener("click", () => setFilter("booked"));
 
 /* ---------- Navne ---------- */
 const dlg = document.getElementById("names-dialog");
 const fields = document.getElementById("names-fields");
 document.getElementById("edit-names").addEventListener("click", () => {
   fields.textContent = "";
-  for (let i = 0; i < 5; i++) {
+  for (let i = 0; i < SLOT_COUNT; i++) {
     const lab = document.createElement("label");
-    lab.textContent = i < 4 ? "Spiller " + (i + 1) : "Vikar";
+    lab.textContent = i < PLAYER_COUNT ? "Spiller " + (i + 1) : "Vikar";
     const inp = document.createElement("input");
     inp.type = "text";
     inp.maxLength = 20;
