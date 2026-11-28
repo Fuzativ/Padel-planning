@@ -4,6 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Padel</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="theme-color" content="#F4F6F2">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Padel">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <style>
   :root {
     --bg: #F4F6F2;
@@ -120,6 +128,16 @@
     background-repeat: no-repeat; background-position: right 10px center; padding-right: 30px;
   }
 
+  .bk-toggle {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    width: 100%; min-height: 44px; padding: 6px 12px; border: 0; border-radius: 10px;
+    background: rgba(29, 42, 36, 0.07); color: var(--ink);
+    font: inherit; font-size: 13px; font-weight: 600; text-align: left; cursor: pointer;
+  }
+  .bk-sum { min-width: 0; overflow-wrap: anywhere; }
+  .bk-chev { flex: 0 0 auto; display: inline-flex; transition: transform 0.15s; }
+  .bk-toggle[aria-expanded="true"] .bk-chev { transform: rotate(180deg); }
+
   .rm-btn {
     height: 44px; border-radius: 10px; background: transparent; cursor: pointer;
     border: 1.5px solid #C73E3E; color: #B03030; font-weight: 600; font-size: 14px;
@@ -133,6 +151,13 @@
   .rm-yes { background: #C73E3E; color: #fff; }
   .rm-no { background: #E7EBE5; color: var(--ink); }
   .bk-warn { font-size: 12px; color: #8A4B00; background: var(--yellow-bg); border-radius: 8px; padding: 6px 10px; }
+  .bk-pp { font-size: 14px; font-weight: 600; background: rgba(29, 42, 36, 0.07); border-radius: 10px; padding: 10px 12px; }
+  .bk-pp[hidden] { display: none; }
+  .act-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .copy-btn {
+    height: 44px; border-radius: 10px; background: transparent; cursor: pointer;
+    border: 1.5px solid var(--ink); color: var(--ink); font-weight: 600; font-size: 14px;
+  }
   .cal-btn {
     height: 44px; border: 0; border-radius: 10px; background: var(--ink); color: #fff;
     font-weight: 600; font-size: 14px; cursor: pointer;
@@ -171,6 +196,7 @@
   <div class="pills" role="group" aria-label="Filter">
     <button type="button" class="pill" id="f-all" aria-pressed="true">Alle dage</button>
     <button type="button" class="pill" id="f-common" aria-pressed="false">Kun mulige dage</button>
+    <button type="button" class="pill" id="f-most" aria-pressed="false">Flest kan</button>
     <button type="button" class="pill" id="f-booked" aria-pressed="false">Booket</button>
   </div>
 
@@ -210,6 +236,7 @@ const DAYS_MAX = 364;                        // øvre grænse (ca. et år)
 let daysShown = DAYS_AHEAD;
 const PLAYER_COUNT = 4;                      // antal faste spillere (fx 2 for to personer)
 const USE_SUBSTITUTE = true;                 // true = vis en vikar-kolonne yderst til højre
+const PARTIAL_MIN = Math.min(2, PLAYER_COUNT - 1);   // mindste antal "kan" i filteret for dage, hvor ikke alle kan
 const SLOT_COUNT = PLAYER_COUNT + (USE_SUBSTITUTE ? 1 : 0);
 const DEFAULT_NAMES = Array.from({ length: SLOT_COUNT }, (_, i) => i < PLAYER_COUNT ? "Spiller " + (i + 1) : "Vikar");
 const DOUBLE_TAP_MS = 400;
@@ -313,6 +340,42 @@ function statusOf(date, i) { return cellOf(date, i).s || "n"; }
 
 function bookingOf(date) { return (state.bookings && state.bookings[date]) || {}; }
 
+// Pris pr. person: banens pris delt på dem, der kan (vikar tæller med, hvis vedkommende kan)
+function participants(key) {
+  let n = greenCount(key);
+  if (USE_SUBSTITUTE && statusOf(key, PLAYER_COUNT) === "g") n++;
+  n = Math.min(n, PLAYER_COUNT);
+  return n || PLAYER_COUNT;
+}
+function fmtKr(x) {
+  const r = Math.round(x * 100) / 100;
+  return (r % 1 === 0 ? String(r) : r.toFixed(2).replace(".", ",")) + " kr";
+}
+function perPerson(key, price) {
+  const p = Number(price);
+  if (!(p > 0)) return null;
+  const n = participants(key);
+  return { amount: p / n, n };
+}
+function perPersonText(key, price) {
+  const pp = perPerson(key, price);
+  if (!pp) return "";
+  return "Pris pr. person: " + fmtKr(pp.amount) + " (" + pp.n + (pp.n === 1 ? " spiller)" : " spillere)");
+}
+function parsePrice(text) {
+  const v = parseFloat(String(text).replace(",", ".").replace(/[^0-9.]/g, ""));
+  return isFinite(v) ? Math.min(Math.max(v, 0), 100000) : NaN;
+}
+
+// "18.00–19.30" ud fra starttid ("18:00") og varighed i minutter
+function formatRange(t, d) {
+  const [hh, mm] = t.split(":").map(Number);
+  const startMin = hh * 60 + mm;
+  const endMin = startMin + (Number(d) || DEFAULT_DURATION);
+  const f = (m) => pad2(Math.floor(m / 60) % 24) + "." + pad2(m % 60);
+  return f(startMin) + "–" + f(endMin);
+}
+
 // ISO 8601-ugenummer (uge 1 er ugen med årets første torsdag, ugen starter mandag)
 function isoWeek(d) {
   const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
@@ -337,6 +400,53 @@ function upcomingDays() {
   return out;
 }
 
+/* ---------- Kopiér til chat ---------- */
+function chatText(day) {
+  const b = bookingOf(day.key);
+  const wd = day.title.charAt(0).toLowerCase() + day.title.slice(1);
+  let s = "Padel " + wd;
+  if (b.t) s += ", kl. " + formatRange(b.t, b.d);
+  const court = b.c ? (/^bane\b/i.test(b.c.trim()) ? b.c.trim() : "Bane: " + b.c.trim()) : "";
+  const place = [b.h, court].filter(Boolean).join(", ");
+  if (place) s += ", " + place;
+  s += ".";
+  const pp = perPerson(day.key, b.p);
+  if (pp) s += " Pris: " + fmtKr(pp.amount) + " pr. person.";
+  if (b.by !== undefined && b.by !== null) s += " Booket af " + nameOf(Number(b.by)) + ".";
+  return s;
+}
+
+async function copyChat(day, btn) {
+  const text = chatText(day);
+  let ok = false;
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text);
+      ok = true;
+    }
+  } catch (e) {}
+  if (!ok) {
+    try {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.setAttribute("readonly", "");
+      ta.style.position = "absolute";
+      ta.style.left = "-9999px";
+      document.body.append(ta);
+      ta.select();
+      ok = document.execCommand("copy");
+      ta.remove();
+    } catch (e) {}
+  }
+  if (!ok) {
+    window.prompt("Kopiér teksten herfra:", text);
+    return;
+  }
+  const old = btn.textContent;
+  btn.textContent = "Kopieret";
+  setTimeout(() => { if (btn.isConnected) btn.textContent = old; }, 1600);
+}
+
 /* ---------- Kalenderfil (.ics) ---------- */
 function icsEscape(s) {
   return String(s).replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\r?\n/g, "\\n");
@@ -358,6 +468,8 @@ function downloadIcs(day) {
   for (let i = 0; i < SLOT_COUNT; i++) if (statusOf(day.key, i) === "g") players.push(nameOf(i));
   const desc = [];
   if (players.length) desc.push("Spillere: " + players.join(", "));
+  const ppIcs = perPerson(day.key, b.p);
+  if (ppIcs) desc.push("Pris: " + fmtKr(ppIcs.amount) + " pr. person");
   if (b.by !== undefined && b.by !== null) desc.push("Booket af: " + nameOf(Number(b.by)));
   const lines = [
     "BEGIN:VCALENDAR",
@@ -392,10 +504,16 @@ const listEl = document.getElementById("list");
 let filter = "all";
 let renderPending = false;
 let confirmRemove = null;   // dato for den booking, der er ved at blive fjernet
+const expanded = new Set(); // datoer, hvor bookingdetaljerne er foldet ud (kun på denne telefon)
+
+function greenCount(key) {
+  let n = 0;
+  for (let i = 0; i < PLAYER_COUNT; i++) if (statusOf(key, i) === "g") n++;
+  return n;
+}
 
 function summarize(key) {
-  let players = 0;
-  for (let i = 0; i < PLAYER_COUNT; i++) if (statusOf(key, i) === "g") players++;
+  const players = greenCount(key);
   const sub = USE_SUBSTITUTE && statusOf(key, PLAYER_COUNT) === "g";
   if (players === PLAYER_COUNT) {
     return { kind: "all", badge: PLAYER_COUNT === 2 ? "Begge kan" : "Alle " + PLAYER_COUNT + " kan" };
@@ -417,13 +535,18 @@ function render() {
   listEl.textContent = "";
   let shown = 0;
   let lastWeek = null;
+  const allDays = upcomingDays();
 
-  for (const day of upcomingDays()) {
+  for (const day of allDays) {
     const sum = summarize(day.key);
     const bk = bookingOf(day.key);
     const booked = bk.b === true;
     if (filter === "common" && !sum.kind && !booked) continue;
     if (filter === "booked" && !booked) continue;
+    if (filter === "most") {
+      const g = greenCount(day.key);
+      if (booked || g < PARTIAL_MIN || g >= PLAYER_COUNT) continue;
+    }
     shown++;
 
     if (day.week !== lastWeek) {
@@ -501,7 +624,35 @@ function render() {
       cb.checked = booked;
       cb.dataset.date = day.key;
       chk.append(cb, document.createTextNode("Bane booket"));
-      sec.append(chk);
+
+      // En booking med tidspunkt kan foldes sammen; uden tidspunkt vises den altid åben
+      const canCollapse = booked && !!bk.t;
+      const open = !canCollapse || expanded.has(day.key);
+
+      if (canCollapse) {
+        const tg = document.createElement("button");
+        tg.type = "button";
+        tg.className = "bk-toggle";
+        tg.dataset.date = day.key;
+        tg.setAttribute("aria-expanded", String(open));
+        tg.setAttribute("aria-label", (open ? "Skjul" : "Vis") + " bookingdetaljer");
+        const txt = document.createElement("span");
+        txt.className = "bk-sum";
+        const parts = [formatRange(bk.t, bk.d)];
+        if (bk.h) parts.push(bk.h);
+        if (bk.c) parts.push(bk.c);
+        if (bk.by !== undefined && bk.by !== null) parts.push("booket af " + nameOf(Number(bk.by)));
+        const ppSum = perPerson(day.key, bk.p);
+        if (ppSum) parts.push(fmtKr(ppSum.amount) + " pr. person");
+        txt.textContent = parts.join(" · ");
+        const chev = document.createElement("span");
+        chev.className = "bk-chev";
+        chev.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 9l7 7 7-7" fill="none" stroke="#1D2A24" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+        tg.append(txt, chev);
+        sec.append(tg);
+      }
+
+      if (open) sec.append(chk);
 
       if (booked) {
         if (!sum.kind) {
@@ -511,6 +662,7 @@ function render() {
           sec.append(warn);
         }
 
+      if (open) {
         const g = document.createElement("div");
         g.className = "bk-grid";
         const mk = (labelText, field) => {
@@ -568,6 +720,15 @@ function render() {
         h.dataset.key = "h";
         mk("Hal", h);
 
+        const pr = document.createElement("input");
+        pr.type = "text";
+        pr.inputMode = "decimal";
+        pr.maxLength = 7;
+        pr.placeholder = "fx 280";
+        pr.value = (bk.p === undefined || bk.p === null) ? "" : String(bk.p).replace(".", ",");
+        pr.dataset.key = "p";
+        mk("Pris for banen (kr)", pr);
+
         const by = document.createElement("select");
         const none = document.createElement("option");
         none.value = "";
@@ -585,13 +746,31 @@ function render() {
 
         sec.append(g);
 
+        const ppEl = document.createElement("div");
+        ppEl.className = "bk-pp";
+        ppEl.id = "pp-" + day.key;
+        ppEl.textContent = perPersonText(day.key, bk.p);
+        ppEl.hidden = !ppEl.textContent;
+        sec.append(ppEl);
+
         if (bk.t) {
+          const row = document.createElement("div");
+          row.className = "act-row";
+
+          const copy = document.createElement("button");
+          copy.type = "button";
+          copy.className = "copy-btn";
+          copy.dataset.date = day.key;
+          copy.textContent = "Kopiér til chat";
+
           const cal = document.createElement("button");
           cal.type = "button";
           cal.className = "cal-btn";
           cal.dataset.date = day.key;
           cal.textContent = "Tilføj til kalender";
-          sec.append(cal);
+
+          row.append(copy, cal);
+          sec.append(row);
         }
 
         if (confirmRemove === day.key) {
@@ -622,7 +801,8 @@ function render() {
           rm.textContent = "Fjern booking";
           sec.append(rm);
         }
-      }
+      }   // slut på "open"
+      }   // slut på "booked"
 
       card.append(sec);
     }
@@ -633,7 +813,11 @@ function render() {
   if (shown === 0) {
     const p = document.createElement("p");
     p.className = "empty";
-    p.textContent = filter === "booked" ? "Ingen bookede dage endnu." : "Ingen dage, hvor alle kan, endnu.";
+    p.textContent = filter === "booked"
+      ? "Ingen bookede dage endnu."
+      : filter === "most"
+        ? "Ingen dage, hvor nogle men ikke alle kan, endnu."
+        : "Ingen dage, hvor alle kan, endnu.";
     listEl.append(p);
   }
 }
@@ -691,6 +875,13 @@ function saveBookingField(el, immediate) {
   let val = el.value.trim();
   if (key === "d") val = Number(val);
   else if (key === "by") val = val === "" ? "" : Number(val);
+  else if (key === "p") {
+    if (val === "") val = "";
+    else {
+      val = parsePrice(val);
+      if (isNaN(val)) return;
+    }
+  }
   const k = "bk|" + date + "|" + key;
   clearTimeout(saveTimers[k]);
   const run = () => store && store.setBooking(date, { [key]: val });
@@ -700,7 +891,17 @@ function saveBookingField(el, immediate) {
 listEl.addEventListener("input", (e) => {
   const el = e.target;
   if (el.classList.contains("note-input")) queueNoteSave(el, false);
-  else if (el.classList.contains("bk-field") && el.type === "text") saveBookingField(el, false);
+  else if (el.classList.contains("bk-field") && el.type === "text") {
+    if (el.dataset.key === "p") {
+      const pp = document.getElementById("pp-" + el.dataset.date);
+      if (pp) {
+        const v = parsePrice(el.value);
+        pp.textContent = isNaN(v) ? "" : perPersonText(el.dataset.date, v);
+        pp.hidden = !pp.textContent;
+      }
+    }
+    saveBookingField(el, false);
+  }
 });
 listEl.addEventListener("change", (e) => {
   const el = e.target;
@@ -710,11 +911,13 @@ listEl.addEventListener("change", (e) => {
     const date = el.dataset.date;
     blurActive();
     if (el.checked) {
+      expanded.add(date);
       store.setBooking(date, { b: true, d: DEFAULT_DURATION });
     } else {
       const b = bookingOf(date);
       const hasData = b.t || b.c || b.h || (b.by !== undefined && b.by !== null);
       if (!hasData) {
+        expanded.delete(date);
         cancelBookingTimers(date);
         store.clearBooking(date);
       } else {
@@ -730,6 +933,14 @@ listEl.addEventListener("focusout", (e) => {
   if (c.contains("note-input") || c.contains("bk-field")) setTimeout(() => { if (renderPending) render(); }, 0);
 });
 listEl.addEventListener("click", (e) => {
+  const tg = e.target.closest(".bk-toggle");
+  if (tg) {
+    const date = tg.dataset.date;
+    if (expanded.has(date)) expanded.delete(date); else expanded.add(date);
+    render();
+    return;
+  }
+
   const rm = e.target.closest(".rm-btn");
   if (rm) { confirmRemove = rm.dataset.date; render(); return; }
 
@@ -739,9 +950,17 @@ listEl.addEventListener("click", (e) => {
   const yes = e.target.closest(".rm-yes");
   if (yes) {
     confirmRemove = null;
+    expanded.delete(yes.dataset.date);
     cancelBookingTimers(yes.dataset.date);
     if (store) store.clearBooking(yes.dataset.date);
     render();
+    return;
+  }
+
+  const cp = e.target.closest(".copy-btn");
+  if (cp) {
+    const dayForCopy = upcomingDays().find((d) => d.key === cp.dataset.date);
+    if (dayForCopy) copyChat(dayForCopy, cp);
     return;
   }
 
@@ -756,6 +975,7 @@ function setFilter(f) {
   document.getElementById("f-all").setAttribute("aria-pressed", String(f === "all"));
   document.getElementById("f-common").setAttribute("aria-pressed", String(f === "common"));
   document.getElementById("f-booked").setAttribute("aria-pressed", String(f === "booked"));
+  document.getElementById("f-most").setAttribute("aria-pressed", String(f === "most"));
   render();
 }
 const moreBtn = document.getElementById("more-days");
@@ -767,6 +987,7 @@ moreBtn.addEventListener("click", () => {
 document.getElementById("f-all").addEventListener("click", () => setFilter("all"));
 document.getElementById("f-common").addEventListener("click", () => setFilter("common"));
 document.getElementById("f-booked").addEventListener("click", () => setFilter("booked"));
+document.getElementById("f-most").addEventListener("click", () => setFilter("most"));
 
 /* ---------- Navne ---------- */
 const dlg = document.getElementById("names-dialog");
